@@ -7,17 +7,23 @@ import (
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/jamalishaq/go-commerce/product-api/handlers"
 )
 
 func main() {
 	l := log.New(os.Stdout, "product-api: ", log.LstdFlags)
 
+	ph := handlers.NewProducts(l)
+
 	sm := http.NewServeMux()
+	sm.Handle("/", ph)
 
 	// Create a new server
 	s := &http.Server{
 		Addr:         ":8080",
 		Handler:      sm,
+		ErrorLog:     l,
 		IdleTimeout:  120 * time.Second,
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,
@@ -42,7 +48,7 @@ func main() {
 	l.Printf("Got signal %v, initiating shutdown\n", sig)
 
 	// Create context with timeout for graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := s.Shutdown(ctx); err != nil {
