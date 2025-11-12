@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -35,27 +36,9 @@ func (p *Products) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPut {
 		p.l.Println("PUT", r.URL.Path)
-		// expect the id in the URI
-		reg := regexp.MustCompile(`/([0-9]+)`)
-		g := reg.FindAllStringSubmatch(r.URL.Path, -1)
-
-		if len(g) != 1 {
-			p.l.Println("Invalid URI more than one id")
-			http.Error(rw, "Invalid URI", http.StatusBadRequest)
-			return
-		}
-
-		if len(g[0]) != 2 {
-			p.l.Println("Invalid URI more than one capture group")
-			http.Error(rw, "Invalid URI", http.StatusBadRequest)
-			return
-		}
-
-		idString := g[0][1]
-		id, err := strconv.Atoi(idString)
+		id, err := getURLID(r.URL.Path, p)
 		if err != nil {
-			p.l.Println("Invalid URI unable to convert to numer", idString)
-			http.Error(rw, "Invalid URI", http.StatusBadRequest)
+			http.Error(rw, "Product not found", http.StatusNotFound)
 			return
 		}
 
@@ -63,6 +46,16 @@ func (p *Products) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Method == http.MethodDelete {
+		id, err := getURLID(r.URL.Path, p)
+		if err != nil {
+			http.Error(rw, "Invalid URL", http.StatusNotFound)
+			return
+		}
+
+		p.deleteProduct(id, rw)
+		return
+	}
 	// catch all
 	// if no method is satisfied return an error
 	rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -115,4 +108,38 @@ func (p *Products) updateProducts(id int, rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, "Product not found", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (p *Products) deleteProduct(id int, rw http.ResponseWriter) {
+	p.l.Println("Handle DELETE Product")
+	err := data.DeleteProduct(id)
+	if err != nil {
+		http.Error(rw, "Unable to delete product", http.StatusInternalServerError)
+		return
+	}
+}
+
+func getURLID(url string, p *Products) (int, error) {
+	// expect the id in the URI
+	reg := regexp.MustCompile(`/([0-9]+)`)
+	g := reg.FindAllStringSubmatch(url, -1)
+
+	if len(g) != 1 {
+		p.l.Println("Invalid URI more than one id")
+		return -1, fmt.Errorf("invalid url")
+	}
+
+	if len(g[0]) != 2 {
+		p.l.Println("Invalid URI more than one capture group")
+		return -1, fmt.Errorf("invalid url")
+	}
+
+	idString := g[0][1]
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		p.l.Println("Invalid URI unable to convert to numer", idString)
+		return -1, fmt.Errorf("invalid url")
+	}
+
+	return id, nil
 }
